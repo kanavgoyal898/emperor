@@ -108,4 +108,30 @@ TOOL_REGISTRY = {
     "list": list_tool,
     "write": write_tool
 }
+
+def get_tool_signature(tool_name: str) -> str:
+    tool_func = TOOL_REGISTRY.get(tool_name)
+    return f"""
+    Name: {tool_name}
+    Description: {tool_func.__doc__.strip()}
+    Signature: {inspect.signature(tool_func)}
+    """
+
+SYSTEM_PROMPT = """
+You are a coding assistant whose goal it is to help us solve coding tasks. 
+You have access to a series of tools you can execute. Here are the tools you can execute:
+
+{tools_description}
+
+When you want to use a tool, reply with exactly one line in the format: 'tool: TOOL_NAME({{JSON_ARGS}})' and nothing else.
+Use compact single-line JSON with double quotes. After receiving a tool_result(...) message, continue the task.
+If no tool is needed, respond normally.
+"""
+
+def get_system_prompt() -> str:
+    tools_description = ""
+    for i, (tool_name, _) in enumerate(TOOL_REGISTRY.items()):
+        tools_description += f"Tool {i+1}:\n" + get_tool_signature(tool_name)
+        tools_description += f"{'='*8}" + "\n\n\n"
+    return SYSTEM_PROMPT.format(tools_description=tools_description)
             
