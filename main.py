@@ -1,5 +1,5 @@
-import os
 import json
+import time
 import inspect
 
 import ollama
@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from constants import *
 from file import resolve_absolute_path
 
 load_dotenv()
@@ -170,3 +171,67 @@ def execute_llm_call(conversation: List[Dict[str, str]]) -> str:
     )
 
     return response.get("message", {}).get("content", "")
+
+def main():
+    print("Initializing Emperor...")
+    time.sleep(0.6)
+
+    username = input("Username: ")
+    print("Setting up environment...")
+    time.sleep(1.2)
+
+    print("Loading tools...")
+    time.sleep(1.8)
+
+    system_prompt = get_system_prompt()
+    print("System prompt:\n", system_prompt)
+    time.sleep(2.4)
+
+    conversation = [{
+        "role": "system",
+        "content": system_prompt
+    }]
+
+    while True:
+        try:
+            user_content = input(f"{COLOR_USER}{username}:{COLOR_SYSTEM}: ")
+        except KeyboardInterrupt:
+            break
+        
+        conversation.append({
+            "role": "user",
+            "content": user_content
+        })
+
+        while True:
+            assistant_response = execute_llm_call(conversation)
+            tool_calls = extract_tool_calls(assistant_response)
+
+            if not tool_calls:
+                print(f"{COLOR_ASSISTANT}{OLLAMA_MODEL_NAME}:{COLOR_SYSTEM}: {assistant_response}")
+                conversation.append({
+                    "role": "assistant",
+                    "content": assistant_response
+                })
+                break
+            else:
+                for tool_name, args in tool_calls:
+                    tool = TOOL_REGISTRY.get(tool_name)
+                    response = ""
+                    
+                    print(f"Executing {tool_name} with {args}...")
+
+                    if tool_name == "read":
+                        response = tool(args.get("file", ""))
+                    if tool_name == "list":
+                        response = tool(args.get("path", ""))
+                    if tool_name == "write":
+                        response = tool(args.get("file", ""), args.get("old_content", ""), args.get("new_content", ""))
+
+                    conversation.append({
+                        "role": "user",
+                        "content": f"tool_result: {json.dumps({'tool': tool_name, 'response': response})}"
+                    })
+
+if __name__ == "__main__":
+    main()
