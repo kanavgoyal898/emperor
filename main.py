@@ -12,8 +12,6 @@ from file import resolve_absolute_path
 
 load_dotenv()
 
-ollama_client = ollama.Client()
-
 def read_tool(file: str) -> Dict[str, Any]:
     """
         Reads the content of a file and returns it as a string.
@@ -153,3 +151,22 @@ def extract_tool_calls(message: str) -> List[Tuple[str, Dict[str, Any]]]:
                 continue
 
     return calls
+
+OLLAMA_MODEL_NAME = "codellama"
+
+def execute_llm_call(conversation: List[Dict[str, str]]) -> str:
+    # content = ""
+
+    # messages = []
+    # for message in conversation:
+    #     if message["role"] == "system":
+    #         content = message["content"]
+    #     else:
+    #         messages.append(message)
+
+    response = ollama.chat(
+        model=OLLAMA_MODEL_NAME,
+        messages=conversation
+    )
+
+    return response.get("message", {}).get("content", "")
