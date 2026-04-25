@@ -8,6 +8,7 @@ def resolve_absolute_path(path: str) -> Path:
         Example:
         file.txt -> /Users/username/.../file.txt
     """
+    
     path = Path(path).expanduser()
     if not path.is_absolute():
         path = (Path.cwd() / path).resolve()
