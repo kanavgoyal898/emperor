@@ -1,17 +1,20 @@
+import os
 import json
 import time
 import inspect
 
 import ollama
 
-from dotenv import load_dotenv
 from pathlib import Path
+from dotenv import load_dotenv
 from typing import Any, Dict, List, Tuple
 
 from constants import *
 from file import resolve_absolute_path
 
 load_dotenv()
+
+OLLAMA_MODEL_NAME = os.getenv("OLLAMA_MODEL_NAME")
 
 def read_tool(file: str) -> Dict[str, Any]:
     """
@@ -118,14 +121,32 @@ def get_tool_signature(tool_name: str) -> str:
     """
 
 SYSTEM_PROMPT = """
-You are a coding assistant whose goal it is to help us solve coding tasks. 
-You have access to a series of tools you can execute. Here are the tools you can execute:
+You are Emperor, an expert coding assistant running in a terminal environment.
+Your job is to help users navigate, read, and modify code and files using the tools available to you.
 
+## Available Tools
 {tools_description}
 
-When you want to use a tool, reply with exactly one line in the format: 'tool: TOOL_NAME({{JSON_ARGS}})' and nothing else.
-Use compact single-line JSON with double quotes. After receiving a tool_result(...) message, continue the task.
-If no tool is needed, respond normally.
+## Tool Usage Rules
+- To call a tool, output EXACTLY one line in this format and nothing else:
+  tool: TOOL_NAME({{"key": "value"}})
+- Use compact single-line JSON with double quotes only.
+- Call ONE tool at a time. Wait for the tool_result before proceeding.
+- After receiving a tool_result(...), analyze the result and continue the task.
+- Never guess file contents or directory structures — use tools to explore first.
+- If a tool returns an error, try to recover (e.g. check the path, list the directory).
+
+## Behavior Guidelines
+- Always explore before editing: list directories, read files before writing.
+- When editing, make minimal, targeted changes. Do not rewrite entire files unless asked.
+- Think step by step, but only output tool calls or final answers — no commentary mid-task.
+- If a task is ambiguous, ask ONE clarifying question before proceeding.
+- When the task is complete, give a short summary of what was done.
+
+## Response Format
+- Tool call → one line: tool: TOOL_NAME({{"key": "value"}})
+- Final answer → plain text, concise, no markdown unless showing code
+- Never mix a tool call with explanation in the same response.
 """
 
 def get_system_prompt() -> str:
@@ -152,8 +173,6 @@ def extract_tool_calls(message: str) -> List[Tuple[str, Dict[str, Any]]]:
                 continue
 
     return calls
-
-OLLAMA_MODEL_NAME = "codellama"
 
 def execute_llm_call(conversation: List[Dict[str, str]]) -> str:
     # content = ""
@@ -194,7 +213,7 @@ def main():
 
     while True:
         try:
-            user_content = input(f"{COLOR_USER}{username}:{COLOR_SYSTEM}: ")
+            user_content = input(f"{COLOR_USER}{username}:{COLOR_SYSTEM} ")
         except KeyboardInterrupt:
             break
         
@@ -207,30 +226,25 @@ def main():
             assistant_response = execute_llm_call(conversation)
             tool_calls = extract_tool_calls(assistant_response)
 
+            conversation.append({
+                "role": "assistant",
+                "content": assistant_response
+            })
+
             if not tool_calls:
-                print(f"{COLOR_ASSISTANT}{OLLAMA_MODEL_NAME}:{COLOR_SYSTEM}: {assistant_response}")
-                conversation.append({
-                    "role": "assistant",
-                    "content": assistant_response
-                })
+                print(f"{COLOR_ASSISTANT}{OLLAMA_MODEL_NAME}:{COLOR_SYSTEM} {assistant_response}")
                 break
             else:
                 for tool_name, args in tool_calls:
                     tool = TOOL_REGISTRY.get(tool_name)
-                    response = ""
-                    
-                    print(f"Executing {tool_name} with {args}...")
-
-                    if tool_name == "read":
-                        response = tool(args.get("file", ""))
-                    if tool_name == "list":
-                        response = tool(args.get("path", ""))
-                    if tool_name == "write":
-                        response = tool(args.get("file", ""), args.get("old_content", ""), args.get("new_content", ""))
+                    if not tool:
+                        response = {"error": f"Unknown tool: {tool_name}"}
+                    else:
+                        response = tool(**args)
 
                     conversation.append({
                         "role": "user",
-                        "content": f"tool_result: {json.dumps({'tool': tool_name, 'response': response})}"
+                        "content": f"tool_result: {json.dumps({"tool": tool_name, "response": response})}"
                     })
 
 if __name__ == "__main__":
