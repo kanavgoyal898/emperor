@@ -45,7 +45,7 @@ def list_tool(path: str) -> Dict[str, Any]:
         If the path is not a directory, returns an error message.
 
         Example:
-        list_tool("/path/to/directory") -> {"path": "/path/to/directory", "contents": [{"item": "file_name.txt", "type": "file"}, {"item": "directory_name", "type": "directory"}]}
+        list_tool("/path/to/directory") -> {"path": "/absolute/path/to/directory", "contents": [{"item": "file_name.txt", "type": "file"}, {"item": "directory_name", "type": "directory"}]}
     """
 
     path = resolve_absolute_path(path)
@@ -70,6 +70,7 @@ def write_tool(file: str, old_content: str, new_content: str) -> Dict[str, Any]:
         If the old content is not found in the file, returns an error message.
         
         Example:
+        write_tool("file.txt", "", "new content.") -> {"path": "/absolute/path/to/file.txt", "action": "File created."}
         write_tool("file.txt", "old content", "new content") -> {"path": "/absolute/path/to/file.txt", "action": "File edited."}
     """
 
@@ -134,4 +135,21 @@ def get_system_prompt() -> str:
         tools_description += f"Tool {i+1}:\n" + get_tool_signature(tool_name)
         tools_description += f"{'='*8}" + "\n\n\n"
     return SYSTEM_PROMPT.format(tools_description=tools_description)
-            
+
+def extract_tool_calls(message: str) -> List[Tuple[str, Dict[str, Any]]]:
+    calls = []
+    for line in message.splitlines():
+        line = line.strip()
+        if line.startswith("tool:"):
+            try:
+                tool_call = line[len("tool:"):].strip()
+                tool_name, json_args = tool_call.split("(", 1)
+                tool_name = tool_name.strip()
+                if json_args.endswith(")"):
+                    json_args = json_args[:-1].strip()
+                    args = json.loads(json_args)
+                    calls.append((tool_name, args))
+            except Exception:
+                continue
+
+    return calls
