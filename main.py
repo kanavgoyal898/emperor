@@ -227,7 +227,7 @@ def main():
             tool_calls = extract_tool_calls(assistant_response)
 
             conversation.append({
-                "role": "assistant",
+                "role": "tool",
                 "content": assistant_response
             })
 
