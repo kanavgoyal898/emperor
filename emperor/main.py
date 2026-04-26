@@ -2,19 +2,22 @@ import os
 import json
 import time
 import inspect
+import argparse
 
 import ollama
 
 from pathlib import Path
-from dotenv import load_dotenv
 from typing import Any, Dict, List, Tuple
 
-from constants import *
-from file import resolve_absolute_path
+from .constants import *
+from .file import resolve_absolute_path
 
-load_dotenv()
 
-OLLAMA_MODEL_NAME = os.getenv("OLLAMA_MODEL_NAME")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Emperor - Terminal Coding Assistant")
+    parser.add_argument("model", help="Ollama model name to use (e.g. gemma4, llama3)")
+    return parser.parse_args()
+
 
 def read_tool(file: str) -> Dict[str, Any]:
     """
@@ -40,7 +43,7 @@ def read_tool(file: str) -> Dict[str, Any]:
             "path": str(path),
             "content": content
         }
-    
+
 def list_tool(path: str) -> Dict[str, Any]:
     """
         Lists the contents of a directory. 
@@ -105,7 +108,7 @@ def write_tool(file: str, old_content: str, new_content: str) -> Dict[str, Any]:
                     "path": str(path),
                     "action": "File edited."
                 }
-            
+
 TOOL_REGISTRY = {
     "read": read_tool,
     "list": list_tool,
@@ -174,24 +177,18 @@ def extract_tool_calls(message: str) -> List[Tuple[str, Dict[str, Any]]]:
 
     return calls
 
-def execute_llm_call(conversation: List[Dict[str, str]]) -> str:
-    # content = ""
-
-    # messages = []
-    # for message in conversation:
-    #     if message["role"] == "system":
-    #         content = message["content"]
-    #     else:
-    #         messages.append(message)
-
+def execute_llm_call(conversation: List[Dict[str, str]], model_name: str) -> str:
     response = ollama.chat(
-        model=OLLAMA_MODEL_NAME,
+        model=model_name,
         messages=conversation
     )
-
     return response.get("message", {}).get("content", "")
 
+
 def main():
+    args = parse_args()
+    model_name = args.model
+
     print("Initializing Emperor...")
     time.sleep(0.6)
 
@@ -216,14 +213,14 @@ def main():
             user_content = input(f"{COLOR_USER}{username}:{COLOR_SYSTEM} ")
         except KeyboardInterrupt:
             break
-        
+
         conversation.append({
             "role": "user",
             "content": user_content
         })
 
         while True:
-            assistant_response = execute_llm_call(conversation)
+            assistant_response = execute_llm_call(conversation, model_name)
             tool_calls = extract_tool_calls(assistant_response)
 
             conversation.append({
@@ -232,7 +229,7 @@ def main():
             })
 
             if not tool_calls:
-                print(f"{COLOR_ASSISTANT}{OLLAMA_MODEL_NAME}:{COLOR_SYSTEM} {assistant_response}")
+                print(f"{COLOR_ASSISTANT}{model_name}:{COLOR_SYSTEM} {assistant_response}")
                 break
             else:
                 for tool_name, args in tool_calls:
@@ -244,8 +241,10 @@ def main():
 
                     conversation.append({
                         "role": "user",
-                        "content": f"tool_result: {json.dumps({"tool": tool_name, "response": response})}"
+                        "content": f"tool_result: {json.dumps({'tool': tool_name, 'response': response})}"
                     })
+
 
 if __name__ == "__main__":
     main()
+    
