@@ -1,12 +1,16 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "emperor"
 version = "0.1.0"
 description = "Terminal coding assistant powered by local Ollama models"
+readme = "README.md"
 requires-python = ">=3.10"
+authors = [
+    { name = "Kanav Goyal" }
+]
 dependencies = [
     "ollama",
 ]
